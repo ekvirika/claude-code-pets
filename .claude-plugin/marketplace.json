@@ -1,0 +1,12 @@
+{
+  "name": "claude-code-pets",
+  "owner": { "name": "Elene Kvirikashvili", "url": "https://github.com/ekvirika" },
+  "description": "Pixel pets for Claude Code",
+  "plugins": [
+    {
+      "name": "pets",
+      "source": "./",
+      "description": "Pixel-art pets that live above your Claude Code prompt"
+    }
+  ]
+}
