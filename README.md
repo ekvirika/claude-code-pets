@@ -1,10 +1,10 @@
 # 🐾 Pets for Claude Code
 
-Pixel-art pets that live above your Claude Code prompt. They walk around while you work, get hungry, nap, wear hats, play fetch, throw a party when your tests pass, faint when they fail, react to the mood of the chat, and look *very* busy when your boss walks by.
+Pixel-art pets that live above your Claude Code prompt. They walk around while you work, get hungry, nap, wear hats, play fetch, throw a party when your tests pass, faint when they fail, react to the mood of the chat, level up as you code together, and look *very* busy when your boss walks by.
 
 ![Pets for Claude Code](media/demo.gif)
 
-▶️ [Watch the full 100-second demo](media/showcase.mp4)
+▶️ [Watch the 30-second demo](media/showcase-short.mp4) · [vertical, for phones](media/showcase-short-vertical.mp4) · [the full 100-second tour](media/showcase.mp4)
 
 ---
 
@@ -16,7 +16,7 @@ You need **Claude Code 2.1.287 or newer**, which supports mods (`claude update` 
 /plugin install pets --marketplace ekvirika/claude-code-pets
 ```
 
-Answer `y` to add the marketplace and pick a scope (user scope gives you pets in every session). Biscuit the golden retriever shows up above your prompt right away. Pets also appear in the Code tab of the Claude desktop app. In a narrow terminal (under 120 columns) the pets shrink to half size automatically; `/pet size large` or `/pet size small` picks one for good.
+Answer `y` to add the marketplace and pick a scope (user scope gives you pets in every session). Biscuit the golden retriever shows up above your prompt right away. Pets also appear in the Code tab of the Claude desktop app. In the terminal they use compact hand-drawn art (10×4 cells) so they don't take over your screen; in the desktop app they're full size. `/pet size tiny`, `small` or `large` picks one for good.
 
 ## Quick start
 
@@ -34,12 +34,12 @@ Or just talk to them in the chat: **"who's a good boy"**, **"Biscuit sit"**, **"
 
 ## What they do
 
-### 🐕 3 animals, 7 breeds, 14 skins
+### 🐕 3 animals, 7 breeds, 15 skins
 - **Dogs:** retriever, dachshund, corgi
 - **Cats:** shorthair, Maine Coon, kitten
 - **Fox**
 
-Every color skin fits every breed of its kind: golden, corgi, black lab, husky, chocolate and samoyed for dogs; ginger, black, gray, siamese and white for cats; red, arctic and silver for foxes. Up to 5 pets at once, remembered between sessions.
+Every color skin fits every breed of its kind: golden, corgi, black lab, husky, chocolate, samoyed and maltipoo for dogs; ginger, black, gray, siamese and white for cats; red, arctic and silver for foxes. Up to 5 pets at once, remembered between sessions.
 
 ![Breeds](media/breeds.svg)
 
@@ -66,6 +66,25 @@ A tiny AI check (one small Haiku call per message) reads the mood:
 | confused | one tilts its head |
 
 They also read **Claude's** replies: worried when it apologizes or hits an error, cheering on a success, and sitting patiently ("👀 your turn") when it asks you a question. `/pet moods off` turns the AI checks off.
+
+### 🏷️ Name tags
+`/pet names on` puts each pet's name over its head. `/pet namecolor <name|all> <color>` colors it: a name like `pink` or `gold`, any `#hex`, or `auto` to match the fur.
+
+### ⭐ They grow with you
+- **Levels:** pets earn XP while you code together and level up, getting a collar at level 3, a scarf at 6 and a crown at 10
+- **Personalities:** each pet is chill, lazy, hyper, grumpy or clingy, and acts like it
+- **Friendships:** pets who spend time near each other become friends (grumpy ones have rivals)
+- **Badges:** first commit, 100 commits, night owl, 10 hours together and more. `/pet stats` shows it all
+
+### 🍅 Useful while you work
+- **Focus:** `/pet focus 25` starts a focus session; the pets nap quietly and call a break when it's over
+- **PR watcher:** with the GitHub CLI (`gh`) signed in, they tell you about new reviews on your PR and cheer or panic when CI turns green or red (`/pet watch off` to stop)
+- **Wellbeing nudges:** a reminder to drink water after 90 minutes nonstop, and to go to bed after midnight (`/pet care off`)
+
+### 🌦️ Their world
+- **Weather:** `/pet weather <city>` (or `on` to find you by IP) shows live weather from wttr.in, with rain or snow falling above the pets. Off by default
+- **Seasons:** snow and santa hats in December, a pumpkin at Halloween (`/pet seasons off`)
+- **Toys:** `/pet toys on` puts out a bed to nap by and a scratching post for the cats
 
 ### 🗣️ Talk to them
 "good boy", "who's a good girl", "Biscuit sit", "Pixel come here", "Nugget roll over", "speak", "dance", "fetch", "nap", "treat", "everyone…". A short message that's only for the pets **isn't sent to Claude**, so it doesn't spend a turn. These are matched locally: instant and free.
@@ -99,7 +118,13 @@ They also read **Claude's** replies: worried when it apologizes or hits an error
 | `/pet breed <name> <breed>`, `/pet skin <name> <skin>` | change looks |
 | `/pet name <name> <new name>`, `/pet remove <name>` | rename, say goodbye |
 | `/pet breeds`, `/pet skins`, `/pet hats` | list them all |
-| `/pet size small\|large\|auto` | small pets (8×3) for narrow terminals; auto switches under 120 columns |
+| `/pet names on\|off`, `/pet namecolor <name\|all> <color>` | name tags and their colors |
+| `/pet stats` | levels, badges, friends |
+| `/pet focus [minutes\|stop]` | a focus session |
+| `/pet toys on\|off` | a bed and a scratching post |
+| `/pet weather <city>\|on\|off` | live weather (off by default) |
+| `/pet seasons\|care\|watch on\|off` | seasons, wellbeing nudges, PR/CI watcher |
+| `/pet size auto\|tiny\|small\|large` | auto: small in the terminal, full size in the desktop app |
 | `/pet off`, `/pet on` | hide or show the pets |
 
 ---
@@ -111,12 +136,16 @@ This is a **Claude Code mod**: a plugin of function hooks that draws into Claude
 - A `ui.render` hook on the band above the prompt draws the pets. It draws *beneath* any band other mods show, never instead of it.
 - In the terminal each sprite is a `Raster` of half-block characters (two pixels per cell, true color). In the desktop app it's a crisp SVG.
 - `tool.call`, `turn.start`, `turn.complete` and `prompt.submit` hooks let the pets notice tests, commits, your mood and Claude's.
-- All state is local. The only network traffic is the optional mood check, which goes through Claude Code's own model client and counts toward your normal Claude usage.
+- All state is local. Network traffic: the mood check (through Claude Code's own model client, counted toward your normal Claude usage), the PR watcher (your own `gh` CLI, every 3 minutes, only if it's installed) and the weather (wttr.in, only if you turn it on).
 
 ```
 hooks/register.tsx   commands, hooks, drawing
 hooks/life.ts        the behavior engine: needs, moods, walking, eating, napping
-hooks/sprites.ts     16×12 sprites, breeds and skins
+hooks/sprites.ts     16×12 sprites plus compact terminal art, breeds and skins
+hooks/growth.ts      levels, badges, personalities, friendships
+hooks/world.ts       weather, seasons, toys
+hooks/watch.ts       the PR and CI watcher
+hooks/tags.ts        name tag colors
 hooks/accessories.ts hats, shades, ties, laptops
 hooks/moods.ts       mood reactions and pet talk
 hooks/sass.ts        reactions to Claude's actions

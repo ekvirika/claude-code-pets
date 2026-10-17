@@ -7,7 +7,7 @@ import { laptopSpot, roll } from '../hooks/life'
 import type { World } from '../hooks/life'
 import { anchor, dress, fainted } from '../hooks/accessories'
 import { react } from '../hooks/sass'
-import { BOWL_FULL, BOWL_SKIN, BREEDS, H, SKINS, W, outlineOf, pixels, shrink } from '../hooks/sprites'
+import { BOWL_FULL, BOWL_SKIN, BREEDS, H, MH, MW, SKINS, TH, TW, W, miniFrame, outlineOf, pixels, shrink, tinyFrame } from '../hooks/sprites'
 
 const BAND = { component: 'AbovePrompt', requestId: 'band', props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 80, scroll: { offset: 0, bodyRows: 12 }, view: {} } } as const
 
@@ -115,11 +115,11 @@ test('commands: adopt a breed, feed, sleep, wake, and the band draws pets and a 
   expect((await $.command.run({ command: 'pet', args: 'sleep Biscuit' } as never)).text).toContain('Biscuit')
   expect((await $.command.run({ command: 'pet', args: 'wake all' } as never)).text).toContain('Rise and shine')
   const roster = await $.command.run({ command: 'pet', args: '' } as never)
-  expect(roster.text).toMatch(/Miso: Kitten, Siamese · food .* energy/)
+  expect(roster.text).toMatch(/Miso: Kitten, Siamese · lv \d+ \w+ · food .* energy/)
   expect((await $.command.run({ command: 'pet', args: 'hat Miso crown' } as never)).text).toContain('crown')
   expect((await $.command.run({ command: 'pet', args: 'boss on' } as never)).text).toContain('look busy')
   const bossUi = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...BAND })
-  expect((await bossUi.findAll({ type: 'Raster' })).length).toBe(4)
+  expect((await bossUi.findAll({ type: 'Raster' })).length).toBe(4) // 2 pets, 2 laptops (toys are off by default)
   await bossUi.unmount()
   expect((await $.command.run({ command: 'pet', args: 'boss off' } as never)).text).toContain('off')
   expect((await $.command.run({ command: 'pet', args: 'ball' } as never)).text).toContain('Fetch')
@@ -177,12 +177,22 @@ test('antics: zoomies are fast, chasers close in on the ball, the ball slows dow
   expect(b.vx).toBe(0)
 })
 
-test('small pets: half the size, eyes kept, and narrow terminals get them automatically', async ($, on) => {
-  const walk = BREEDS.dog.retriever!.poses.walk[0]!
-  const small = shrink(walk)
-  expect(small.length).toBe(6)
-  expect(small[0]!.length).toBe(8)
-  expect(small.join('')).toContain('E')
+test('mini art in the terminal, full art on desktop; name tags in your colors', async ($, on) => {
+  for (const breeds of Object.values(BREEDS)) {
+    for (const id of Object.keys(breeds)) {
+      for (const pose of ['walk', 'sit', 'sleep', 'happy', 'eat', 'faint'] as const) {
+        const sp = 'retriever' in breeds ? 'dog' : 'shorthair' in breeds ? 'cat' : 'fox'
+        const f = miniFrame(sp, id, pose, 0)
+        expect(f.length).toBe(MH)
+        for (const row of f) expect(row.length).toBe(MW)
+        const t = tinyFrame(sp, id, pose, 0)
+        expect(t.length).toBe(TH)
+        for (const row of t) expect(row.length).toBe(TW)
+      }
+    }
+  }
+  expect(miniFrame('cat', 'kitten', 'walk', 0).join('')).toContain('E')
+  expect(shrink(BREEDS.dog.retriever!.poses.walk[0]!).length).toBe(6)
 
   mock.clock(on)
   mock.store(on)
@@ -193,13 +203,52 @@ test('small pets: half the size, eyes kept, and narrow terminals get them automa
   on('command.register', () => ({ value: undefined }) as never)
   on('session.start', () => ({ cwd: '/x' }))
   await $.session.start({ cwd: '/x' } as never)
-  const narrow = { ...BAND, props: { ...BAND.props, bodyColumns: 76 } }
-  const ui = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...narrow })
-  const raster = await ui.find({ type: 'Raster' })
-  expect((raster as unknown as { props: { columns: number; rows: number } }).props.columns).toBe(8)
+  const cols = async (surface: 'terminal' | 'desktop') => {
+    const ui = await $.ui.mount({ plugin: 'pets', surface, ...BAND })
+    const el = (await ui.find({ type: surface === 'terminal' ? 'Raster' : 'Svg' })) as unknown as { props: { columns?: number; width?: number } }
+    await ui.unmount()
+    return el.props.columns ?? el.props.width
+  }
+  expect(await cols('terminal')).toBe(10)
+  expect(await cols('desktop')).toBe(48)
+  await $.command.run({ command: 'pet', args: 'size small' } as never)
+  expect(await cols('terminal')).toBe(10)
+  await $.command.run({ command: 'pet', args: 'size tiny' } as never)
+  expect(await cols('terminal')).toBe(8)
+  await $.command.run({ command: 'pet', args: 'size large' } as never)
+  expect(await cols('terminal')).toBe(16)
+
+  // name tags: on, colored, back to auto
+  expect((await $.command.run({ command: 'pet', args: 'namecolor Biscuit pink' } as never)).text).toContain('pink')
+  const ui = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...BAND })
+  const tag = (await ui.find({ type: 'Text', text: 'Biscuit' })) as unknown as { props: { color: string } }
+  expect(tag.props.color).toBe('#FF8CC6')
   await ui.unmount()
-  expect((await $.command.run({ command: 'pet', args: 'size large' } as never)).text).toContain('large')
-  const big = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...narrow })
-  expect((await big.find({ type: 'Raster' }) as unknown as { props: { columns: number } }).props.columns).toBe(16)
-  await big.unmount()
+  expect((await $.command.run({ command: 'pet', args: 'namecolor Biscuit nope' } as never)).text).toContain('Colors:')
+  expect((await $.command.run({ command: 'pet', args: 'names off' } as never)).text).toContain('off')
+})
+
+test('several sessions share one roster: a removal in one is not undone by another', async ($, on) => {
+  mock.clock(on)
+  const store = new Map<string, unknown>()
+  on('store.get', ($, e) => ({ value: store.get((e as { key: string }).key) }) as never)
+  on('store.set', ($, e) => {
+    const { key, value } = e as { key: string; value: unknown }
+    store.set(key, JSON.parse(JSON.stringify(value)))
+    return { value: undefined } as never
+  })
+  on('command.register', () => ({ value: undefined }) as never)
+  on('session.start', () => ({ cwd: '/x' }))
+  await $.session.start({ cwd: '/x' } as never)
+  await $.command.run({ command: 'pet', args: 'add cat Miso' } as never)
+  const before = store.get('pets') as { rosterVersion: number; pets: Array<{ name: string }> }
+  expect(before.pets.map(p => p.name)).toEqual(['Biscuit', 'Miso'])
+  // another session removes Miso and writes a newer roster
+  store.set('pets', { ...before, rosterVersion: before.rosterVersion + 1, pets: before.pets.filter(p => p.name !== 'Miso') })
+  // this session's next save takes the newer roster instead of writing Miso back
+  await $.command.run({ command: 'pet', args: 'feed' } as never)
+  const after = store.get('pets') as { pets: Array<{ name: string }> }
+  expect(after.pets.map(p => p.name)).toEqual(['Biscuit'])
+  const roster = await $.command.run({ command: 'pet', args: '' } as never)
+  expect(roster.text).not.toContain('Miso')
 })

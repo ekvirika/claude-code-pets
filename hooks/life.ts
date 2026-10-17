@@ -2,6 +2,9 @@ import type { Ball, Pet, PetMood } from '../types'
 import { CORPORATE } from './sass'
 import { BREEDS, SKINS, W, breedOf } from './sprites'
 import type { Pose, Species } from './sprites'
+import { TRAITS } from './growth'
+import type { Trait } from './growth'
+import { BED_W } from './world'
 
 export const TICK_MS = 200
 export const PER_MINUTE = 60_000 / TICK_MS
@@ -14,7 +17,6 @@ const HUNGER_PER_TICK = 100 / (120 * PER_MINUTE)
 const ENERGY_PER_TICK = 100 / (60 * PER_MINUTE)
 const REST_PER_TICK = 100 / (8 * PER_MINUTE)
 export const HUNGRY = 25
-const TIRED = 10
 
 export const SPECIES: Species[] = ['dog', 'cat', 'fox']
 export const NAMES: Record<Species, string[]> = {
@@ -48,10 +50,34 @@ export const FIRST: Pet = {
   bowl: null,
   hat: null,
   chasing: null,
+  xp: 0,
+  trait: 'chill',
+  nameColor: null,
 }
 
 // What the rest of the band looks like to one pet this tick.
-export type World = { width: number; working: boolean; idle: number; boss: boolean; ball: Ball | null; positions: Readonly<Record<string, number>> }
+export type World = {
+  width: number
+  working: boolean
+  idle: number
+  boss: boolean
+  ball: Ball | null
+  positions: Readonly<Record<string, number>>
+  /** A focus session is running: everyone naps quietly. */
+  focus?: boolean
+  /** Where the bed and the scratching post stand, when the toys are out. */
+  bed?: number | null
+  post?: number | null
+}
+
+// How each personality changes the day: tiredness, zoomies, sitting, pace.
+const TRAIT_FX: Record<Trait, { tired: number; drain: number; zoom: number; sit: number; pace: number }> = {
+  chill: { tired: 10, drain: 1, zoom: 0.0015, sit: 0.012, pace: 3 },
+  lazy: { tired: 25, drain: 1.3, zoom: 0, sit: 0.03, pace: 4 },
+  hyper: { tired: 8, drain: 1.5, zoom: 0.006, sit: 0.005, pace: 2 },
+  grumpy: { tired: 12, drain: 1, zoom: 0.0008, sit: 0.02, pace: 3 },
+  clingy: { tired: 10, drain: 1, zoom: 0.0015, sit: 0.012, pace: 3 },
+}
 
 export const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 const pickWith = <T,>(list: readonly T[], roll: number) => list[Math.floor(roll * 997) % list.length] as T
@@ -76,9 +102,17 @@ export function laptopSpot(p: Pick<Pet, 'x' | 'dir'>, width: number): { x: numbe
   return { x: p.x + W, dir: 1 }
 }
 
+// Each pet has its own place by the bed, so a sleepy crowd doesn't end up in one heap.
+export function bedSpot(bed: number, id: string, maxX: number): number {
+  let h = 0
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return clamp(bed + BED_W + 1 + (h % 4) * (W + 2), 0, maxX)
+}
+
 // One step of one pet: needs, where it is, which way it faces, what it is doing.
 export function step(p: Pet, world: World, roll: number): Pet {
   const { width, working, idle, boss, ball, positions } = world
+  const fx = TRAIT_FX[p.trait] ?? TRAIT_FX.chill
   const maxX = Math.max(0, width - W)
   let { x, dir, mood, moodTicks, bubble, bubbleTicks, hunger, energy, bowl, chasing } = p
   const frame = p.frame + 1
@@ -89,7 +123,7 @@ export function step(p: Pet, world: World, roll: number): Pet {
   const isResting = mood === 'nap' || mood === 'sleep'
   const isRushing = mood === 'run' || mood === 'zoom' || mood === 'chase' || mood === 'hide'
   hunger = Math.max(0, hunger - HUNGER_PER_TICK)
-  energy = clamp(energy + (isResting ? REST_PER_TICK : isRushing ? -2 * ENERGY_PER_TICK : -ENERGY_PER_TICK), 0, 100)
+  energy = clamp(energy + (isResting ? REST_PER_TICK : (isRushing ? -2 : -1) * ENERGY_PER_TICK * fx.drain), 0, 100)
   const say = (text: string, forTicks = 14) => {
     bubble = text
     bubbleTicks = forTicks
@@ -107,6 +141,13 @@ export function step(p: Pet, world: World, roll: number): Pet {
     chasing = null
     bowl = null
     if (!bubble && roll < (working ? 0.03 : 0.006)) say(working ? pickWith(['⌨️⌨️⌨️', 'typing furiously', 'in the zone', 'deploying synergy'], roll) : pickWith(CORPORATE, roll), 18)
+  } else if (world.focus) {
+    // Focus time: everyone naps quietly where they are, no bubbles.
+    if (mood !== 'nap') become('nap')
+    chasing = null
+    bowl = null
+    bubble = ''
+    bubbleTicks = 0
   } else if (mood === 'eat') {
     if (moodTicks === 0) {
       hunger = 100
@@ -157,6 +198,32 @@ export function step(p: Pet, world: World, roll: number): Pet {
       chasing = null
       become('walk')
     }
+  } else if (mood === 'gather' && (chasing === 'bed' || chasing === 'post' || chasing?.startsWith('napnear:'))) {
+    // Off to a toy, or to nap beside a friend.
+    const spot =
+      chasing === 'bed'
+        ? bedSpot(world.bed ?? 0, p.id, maxX)
+        : chasing === 'post'
+          ? clamp((world.post ?? maxX) - W, 0, maxX)
+          : clamp(Number(chasing.slice(8)), 0, maxX)
+    if ((chasing === 'bed' && world.bed == null) || (chasing === 'post' && world.post == null)) {
+      chasing = null
+      become('walk')
+    } else if (x !== spot) {
+      dir = spot > x ? 1 : -1
+      speed = 1
+    } else if (chasing === 'post') {
+      chasing = null
+      dir = 1
+      become('sit', 18)
+      say('*scratch scratch*', 16)
+    } else {
+      const wasBed = chasing === 'bed'
+      chasing = null
+      dir = -1
+      become('nap')
+      say(wasBed ? 'my bed ♥' : '*snuggles up*', 12)
+    }
   } else if (mood === 'chase' && chasing !== null) {
     const target = chasing === 'ball' ? (ball ? ball.x + 1 : undefined) : positions[chasing]
     if (target === undefined || (chasing !== 'ball' && moodTicks === 0)) {
@@ -177,8 +244,12 @@ export function step(p: Pet, world: World, roll: number): Pet {
     }
   } else if (mood === 'happy' && moodTicks > 0) {
     // stays happy, hopping in place
-  } else if (energy < TIRED) {
-    become('nap')
+  } else if (energy < fx.tired) {
+    // Tired: to the bed if there is one, else a nap right here.
+    if (world.bed != null && x !== bedSpot(world.bed, p.id, maxX)) {
+      become('gather')
+      chasing = 'bed'
+    } else become('nap')
     say('yawn…', 12)
   } else if (working) {
     mood = 'run'
@@ -187,17 +258,26 @@ export function step(p: Pet, world: World, roll: number): Pet {
     mood = 'sleep'
   } else if (mood === 'sit' && moodTicks > 0) {
     mood = 'sit'
-  } else if (roll < 0.0015 && energy > 50) {
+  } else if (roll < fx.zoom && energy > 50) {
     become('zoom', 30)
     say('ZOOMIES!', 12)
     speed = 2
-  } else if (roll < 0.012) {
+  } else if (p.species === 'cat' && world.post != null && roll > 0.4 && roll < 0.4015) {
+    // Cats visit the scratching post now and then.
+    become('gather')
+    chasing = 'post'
+  } else if (p.trait === 'clingy' && roll > 0.6 && roll < 0.6025) {
+    // Clingy pets drift back to the middle, near you.
+    become('gather', 30)
+    chasing = `spot:${Math.floor(maxX / 2)}`
+    say('*leans on you*', 12)
+  } else if (roll < fx.sit) {
     become('sit', 15 + Math.round(roll * 2000))
   } else {
     if (roll > 0.995) dir = dir === 1 ? -1 : 1
     mood = 'walk'
     // A hungry pet drags its paws.
-    speed = frame % (hunger < HUNGRY ? 5 : 3) === 0 ? 1 : 0
+    speed = frame % (hunger < HUNGRY ? fx.pace + 2 : fx.pace) === 0 ? 1 : 0
     if (hunger < HUNGRY && !bubble && roll > 0.5 && roll < 0.503) say('hungry… 🍖', 15)
   }
 
@@ -236,6 +316,17 @@ export function poseOf(p: Pick<Pet, 'mood' | 'x'>, moving = false): Pose {
   }
 }
 
+// Spreads pets out evenly across the band, each facing a random way, so nobody starts in a heap.
+export function spread(pets: readonly Pet[], width: number, roll = Math.random): Pet[] {
+  const room = Math.max(0, width - W)
+  const slot = room / Math.max(1, pets.length)
+  return pets.map((p, i) => ({
+    ...p,
+    x: clamp(Math.round(slot * i + slot / 2 - W / 2 + (roll() - 0.5) * Math.min(6, slot / 3)), 0, room),
+    dir: roll() < 0.5 ? 1 : -1,
+  }))
+}
+
 // Puts a bowl down a little ahead of the pet.
 export function feed(p: Pet, width: number): Pet {
   if (p.bowl !== null || p.mood === 'eat') return p
@@ -256,7 +347,13 @@ export function wake(p: Pet): Pet {
 // Busy pets (eating, napping, fainted) sit out the fun.
 export const isFree = (p: Pet) => ['walk', 'sit', 'happy', 'run', 'sleep'].includes(p.mood) && p.bowl === null
 
-export function adopt(species: Species, opts: { breed?: string; skin?: string; name?: string; hat?: string | null }, taken: readonly Pet[], width: number, roll = Math.random): Pet {
+export function adopt(
+  species: Species,
+  opts: { breed?: string; skin?: string; name?: string; hat?: string | null; xp?: number; trait?: Trait; nameColor?: string | null },
+  taken: readonly Pet[],
+  width: number,
+  roll = Math.random,
+): Pet {
   const breedId = opts.breed && BREEDS[species][opts.breed] ? opts.breed : Object.keys(BREEDS[species])[0]!
   const skins = Object.keys(SKINS[species])
   const skin = opts.skin && skins.includes(opts.skin) ? opts.skin : opts.breed ? breedOf(species, breedId).skin : pickWith(skins, roll())
@@ -273,6 +370,9 @@ export function adopt(species: Species, opts: { breed?: string; skin?: string; n
     hunger: 70 + Math.round(roll() * 30),
     energy: 80 + Math.round(roll() * 20),
     hat: opts.hat ?? null,
+    xp: opts.xp ?? 0,
+    trait: opts.trait && TRAITS.includes(opts.trait) ? opts.trait : pickWith(TRAITS, roll()),
+    nameColor: opts.nameColor ?? null,
   }
 }
 

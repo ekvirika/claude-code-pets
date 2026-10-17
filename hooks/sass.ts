@@ -5,6 +5,9 @@ export type Reaction = { kind: 'party' | 'faint' | 'hide' | 'quip'; text: string
 const TESTS = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bpytest\b|\bjest\b|\bvitest\b|\bgo test\b|\bcargo test\b|\bmocha\b|\brspec\b|\bplugin test\b|\bmake test\b/
 const COMMIT = /\bgit\s+commit\b/
 
+export const isTestCommand = (command: string) => TESTS.test(command)
+export const isCommitCommand = (command: string) => COMMIT.test(command)
+
 export const CORPORATE = [
   'per my last email…',
   "let's circle back",

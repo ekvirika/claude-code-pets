@@ -606,6 +606,7 @@ export const SKINS: Record<Species, Record<string, Skin>> = {
     husky: { label: 'Husky', B: '#8C96A3', D: '#3E4650', L: '#F4F4F4', E: '#5BC0F8', N: '#1B1B1B', P: '#F27C8A' },
     choco: { label: 'Chocolate', B: '#7B4A2D', D: '#4A2A17', L: '#B07A55', E: '#1B1B1B', N: '#1B1B1B', P: '#F27C8A' },
     snow: { label: 'Samoyed', B: '#F2F2F2', D: '#C9C9C9', L: '#FFFFFF', E: '#1B1B1B', N: '#1B1B1B', P: '#F27C8A' },
+    maltipoo: { label: 'Maltipoo', B: '#F1D2A6', D: '#C8956A', L: '#FFF4E4', E: '#1B1B1B', N: '#1B1B1B', P: '#F27C8A' },
   },
   cat: {
     ginger: { label: 'Ginger tabby', B: '#F09A3E', D: '#B8621A', L: '#FFE3C2', E: '#3D8B37', N: '#F27C8A', P: '#F27C8A' },
@@ -635,13 +636,16 @@ export const BOWL_SKIN: Skin = { label: 'Bowl', B: '#4A7BD0', D: '#2E4E8A', L: '
 
 // The sprite's colors, row by row: null where the pixel is empty.
 // An empty pixel beside the pet (up, down, left or right) becomes the outline.
-export function pixels(frame: Frame, skin: Skin, dir: 1 | -1): (string | null)[][] {
+// openGaps: a one-pixel gap between two filled pixels stays empty instead of
+// being outlined, so the legs of the small pets don't melt into one block.
+export function pixels(frame: Frame, skin: Skin, dir: 1 | -1, openGaps = false): (string | null)[][] {
   const width = frame[0]?.length ?? W
   const filled = (r: number, c: number) => c >= 0 && c < width && (frame[r]?.[c] ?? '.') !== '.'
   const edge = outlineOf(skin)
   return frame.map((row, r) => {
     const cells = [...row].map((ch, c) => {
       if (ch !== '.') return skin[ch as 'B' | 'D' | 'L' | 'E' | 'N' | 'P' | 'H'] ?? ACCENTS[ch] ?? null
+      if (openGaps && filled(r, c - 1) && filled(r, c + 1)) return null
       return filled(r - 1, c) || filled(r + 1, c) || filled(r, c - 1) || filled(r, c + 1) ? edge : null
     })
     return dir === 1 ? cells : cells.reverse()
@@ -673,4 +677,170 @@ export function shrink(f: Frame): Frame {
     out.push(row)
   }
   return out
+}
+
+// Mini pets for narrow terminals: their own 10×8 art (10 columns × 4 rows), not a shrunken copy.
+export const MW = 10
+export const MH = 8
+export type MiniSet = { walk: [Frame, Frame]; sit: Frame; sleep: Frame }
+const MINI_ART: Record<string, MiniSet> = {
+  DOG: {
+    walk: [
+      ['.....DBB..', '.....BEBB.', 'D....BBLLN', '.D...BBP..', '.BBBBBBB..', '.BBLLLBB..', '.B.B.B.B..', '.D.D.D.D..'],
+      ['.....DBB..', 'D....BEBB.', '.D...BBLLN', '..D..BBP..', '.BBBBBBB..', '.BBLLLBB..', '..BB.BB...', '..DD.DD...'],
+    ],
+    sit: ['....DBB...', '....BEBB..', '....BBLLN.', '....BBP...', '...BBBB...', '.D.BBLB...', '..BBBLB...', '..DD.DD...'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '.....DBB..', 'D.BBBBDBLN', '.BBLLLBBB.'],
+  },
+  DACHS: {
+    walk: [
+      ['..........', '..........', '......DBB.', '......BEBB', 'D.....BBLN', '.BBBBBBBB.', '.BLLLLLLB.', '.D.D..D.D.'],
+      ['..........', '..........', '......DBB.', '.D....BEBB', 'D.....BBLN', '.BBBBBBBB.', '.BLLLLLLB.', '..DD..DD..'],
+    ],
+    sit: ['..........', '....DBB...', '....BEBB..', '....BBLN..', '...BBBB...', '.D.BBLB...', '..BBBLB...', '..DD.DD...'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '.....DBB..', 'D.BBBBDBLN', '.BLLLLLBB.'],
+  },
+  CORGI: {
+    walk: [
+      ['..........', '.....D.D..', '.....BBB..', '.....BEBB.', 'B....BBLLN', 'BBBBBBBB..', '.BLLLLLB..', '.DD...DD..'],
+      ['..........', '.....D.D..', '.....BBB..', '.....BEBB.', 'B....BBLLN', 'BBBBBBBB..', '.BLLLLLB..', '..DD.DD...'],
+    ],
+    sit: ['....D.D...', '....BBB...', '....BEBB..', '....BBLLN.', '...BBBB...', '..BBLLB...', '.BBBLLB...', '.DDD.DD...'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '.....D.D..', 'BBBBBBDBLN', '.BLLLLLBB.'],
+  },
+  CAT: {
+    walk: [
+      ['.....B.B..', 'B....BBB..', 'B....BEBB.', '.B...BBN..', '.BBBBBBB..', '.BBLLLBB..', '.B.B.B.B..', '.D.D.D.D..'],
+      ['.....B.B..', '.B...BBB..', '.B...BEBB.', '.B...BBN..', '.BBBBBBB..', '.BBLLLBB..', '..BB.BB...', '..DD.DD...'],
+    ],
+    sit: ['....B.B...', '....BBB...', '....BEBB..', '....BBN...', '...BBBB...', '.B.BLLB...', '..BBLLB...', '..DD.DD...'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '.....B.B..', 'BBBBBBDBN.', 'BBBLLLBB..'],
+  },
+  COON: {
+    walk: [
+      ['.....B.B..', 'BB...BBB..', 'BB...BEBB.', 'BB..LBBN..', '.BBBBBBB..', '.BBLLLBB..', '.B.B.B.B..', '.D.D.D.D..'],
+      ['.B...B.B..', 'BBB..BBB..', '.BB..BEBB.', '.B..LBBN..', '.BBBBBBB..', '.BBLLLBB..', '..BB.BB...', '..DD.DD...'],
+    ],
+    sit: ['....B.B...', '....BBB...', '....BEBB..', '...LBBN...', 'BB.BBBB...', 'BBBBLLB...', '.BBBLLB...', '..DD.DD...'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '.....B.B..', 'BBBBBBDBN.', 'BBBBLLBB..'],
+  },
+  KITTEN: {
+    walk: [
+      ['..........', '.....B.B..', '.....BBB..', '.B...BEBB.', '..B..BBN..', '..BBBBB...', '..BLLLB...', '..D.D.D...'],
+      ['..........', '.....B.B..', '.B...BBB..', '..B..BEBB.', '..B..BBN..', '..BBBBB...', '..BLLLB...', '...D.DD...'],
+    ],
+    sit: ['..........', '..........', '....B.B...', '....BBB...', '....BEBB..', '.B..BBN...', '..BBBLB...', '..DD.D....'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '..........', '......B.B.', '.BBBBBDBN.'],
+  },
+  FOX: {
+    walk: [
+      ['.....B.B..', '.....BBB..', 'L....BEBB.', 'BB...LLLN.', 'BBBBBBBB..', '.BBLLLBB..', '.D.D.D.D..', '.D.D.D.D..'],
+      ['L....B.B..', 'BB...BBB..', 'BB...BEBB.', '.B...LLLN.', '.BBBBBBB..', '.BBLLLBB..', '..DD.DD...', '..DD.DD...'],
+    ],
+    sit: ['....B.B...', '....BBB...', '....BEBB..', '....LLLN..', '...BBBB...', 'L..BLLB...', 'BBBBLLB...', '..DD.DD...'],
+    sleep: ['..........', '..........', '..........', '..........', '..........', '.....B.B..', 'LBBBBBDBB.', 'LLBBLLLLN.'],
+  },
+}
+const MINI_OF: Record<string, keyof typeof MINI_ART> = {
+  retriever: 'DOG',
+  dachshund: 'DACHS',
+  corgi: 'CORGI',
+  shorthair: 'CAT',
+  mainecoon: 'COON',
+  kitten: 'KITTEN',
+  fox: 'FOX',
+}
+
+export function miniFrame(species: Species, breedId: string | undefined, pose: Pose, tick: number): Frame {
+  return compactFrame('small', species, breedId, pose, tick)
+}
+
+export function tinyFrame(species: Species, breedId: string | undefined, pose: Pose, tick: number): Frame {
+  return compactFrame('tiny', species, breedId, pose, tick)
+}
+
+// The compact art for a pose (small: 10×8, tiny: 8×6): a two-frame walk, a sit that blinks, a sleep, a hop.
+export function compactFrame(kind: 'small' | 'tiny', species: Species, breedId: string | undefined, pose: Pose, tick: number): Frame {
+  const id = breedId && MINI_OF[breedId] ? breedId : Object.keys(BREEDS[species])[0]!
+  const set = kind === 'tiny' ? TINY_ART : MINI_ART
+  const art = set[MINI_OF[id] ?? 'DOG']!
+  const [a, b] = art.walk
+  const width = a[0]?.length ?? MW
+  const up = (f: Frame) => [...f.slice(1), '.'.repeat(width)]
+  switch (pose) {
+    case 'walk':
+      return tick % 2 ? b : a
+    case 'sit':
+      return tick % 8 === 7 ? art.sit.map(r => r.replace(/E/g, 'D')) : art.sit
+    case 'sleep':
+      return art.sleep
+    case 'happy':
+      return tick % 2 ? a : up(a)
+    case 'eat':
+      return tick % 2 ? a : up(a).map((r, i) => (i === 0 ? r : r))
+    case 'faint':
+      return fainted(a)
+  }
+}
+
+// Tiny pets, the terminal's default: 8×6 art, 8 columns × 3 rows.
+export const TW = 8
+export const TH = 6
+const TINY_ART: Record<string, MiniSet> = {
+  DOG: {
+    walk: [
+      ['....DBB.', '....BEBB', 'D...BBLN', '.BBBBBL.', '.BBLLBB.', '.D.D.D.D'],
+      ['....DBB.', 'D...BEBB', '.D..BBLN', '.BBBBBL.', '.BBLLBB.', '..D.D.D.'],
+    ],
+    sit: ['...DBB..', '...BEBB.', '...BBLN.', '..BBBL..', '.DBBLB..', '..DD.D..'],
+    sleep: ['........', '........', '........', '....DBB.', 'D.BBBDBN', '.BBLLBB.'],
+  },
+  DACHS: {
+    walk: [
+      ['........', '.....DB.', 'D....BEB', '.BBBBBLN', '.BLLLLB.', '.D.D.D.D'],
+      ['........', '.....DB.', '.D...BEB', 'DBBBBBLN', '.BLLLLB.', '..D.D.D.'],
+    ],
+    sit: ['........', '...DB...', '...BEB..', '..BBLN..', '.DBBLB..', '..DD.D..'],
+    sleep: ['........', '........', '........', '.....DB.', 'D.BBBDBN', '.BLLLLB.'],
+  },
+  CORGI: {
+    walk: [
+      ['.....D.D', '.....BEB', 'B....BLN', 'BBBBBBL.', '.BLLLB..', '.DD..DD.'],
+      ['.....D.D', '.....BEB', 'B....BLN', 'BBBBBBL.', '.BLLLB..', '..DD.DD.'],
+    ],
+    sit: ['...D.D..', '...BEB..', '...BLN..', '..BBL...', '.BBLB...', '.DD.D...'],
+    sleep: ['........', '........', '........', '.....D.D', 'BBBBBDBN', '.BLLLBB.'],
+  },
+  CAT: {
+    walk: [
+      ['....B.B.', 'B...BEBB', '.B..BBN.', '..BBBBB.', '..BLLBB.', '..D.D.D.'],
+      ['....B.B.', '.B..BEBB', 'B...BBN.', '..BBBBB.', '..BLLBB.', '...D.D.D'],
+    ],
+    sit: ['...B.B..', '...BEBB.', '...BBN..', '..BBBB..', '.BBLLB..', '.BDD.D..'],
+    sleep: ['........', '........', '........', '....B.B.', 'BBBBBDBB', 'BBLLLBN.'],
+  },
+  COON: {
+    walk: [
+      ['B...B.B.', 'BB..BEBB', 'BB.LBBN.', '.BBBBBB.', '..BLLBB.', '..D.D.D.'],
+      ['.B..B.B.', 'BBB.BEBB', '.B.LBBN.', '.BBBBBB.', '..BLLBB.', '...D.D.D'],
+    ],
+    sit: ['...B.B..', '...BEBB.', '..LBBN..', 'B.BBBB..', 'BBBLLB..', '..DD.D..'],
+    sleep: ['........', '........', '........', '....B.B.', 'BBBBBDBB', 'BBBLLBN.'],
+  },
+  KITTEN: {
+    walk: [
+      ['...B.B..', '...BEBB.', 'B..BBN..', '.BBBBB..', '..BLLB..', '..D..D..'],
+      ['...B.B..', '...BEBB.', '.B.BBN..', '.BBBBB..', '..BLLB..', '...DD...'],
+    ],
+    sit: ['........', '...B.B..', '...BEBB.', '...BBN..', '.BBBLB..', '..DD.D..'],
+    sleep: ['........', '........', '........', '........', '...B.B..', '.BBBBDBN'],
+  },
+  FOX: {
+    walk: [
+      ['....B.B.', '....BEBB', 'LB..LLLN', 'BBBBBBB.', '.BBLLB..', '..D..D..'],
+      ['....B.B.', 'L...BEBB', 'BB..LLLN', '.BBBBBB.', '.BBLLB..', '...DD...'],
+    ],
+    sit: ['...B.B..', '...BEBB.', '...LLLN.', 'L..BBB..', 'BBBBLB..', '..DD.D..'],
+    sleep: ['........', '........', '........', '....B.B.', 'LBBBBDBB', 'LLBLLLLN'],
+  },
 }

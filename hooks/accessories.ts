@@ -16,7 +16,7 @@ export const ACCENTS: Record<string, string> = {
 
 export type Hat = 'party' | 'crown' | 'wizard' | 'santa' | 'tophat'
 export type Accessory = Hat | 'shades' | 'bowtie'
-export type Wearable = Accessory | 'tie'
+export type Wearable = Accessory | 'tie' | 'collar' | 'scarf'
 export const ACCESSORIES: Accessory[] = ['party', 'crown', 'wizard', 'santa', 'tophat', 'shades', 'bowtie']
 
 // Hats are 5 wide and 4 tall, drawn sitting on the head, centered over the eye.
@@ -83,6 +83,19 @@ export function dress(f: Frame, items: readonly Wearable[], mono = false): Frame
     put(g, at, col - 2, ink || 'R')
     put(g, at, col - 1, mono ? 'B' : 'K')
     put(g, at, col, ink || 'R')
+  }
+  // Level looks: a collar with a gold tag, later a scarf.
+  if (items.includes('collar')) {
+    const at = eye + (hasHeart ? 2 : 3)
+    put(g, at, col - 2, ink || 'R')
+    put(g, at, col - 1, ink || 'Y')
+    put(g, at, col, ink || 'R')
+  }
+  if (items.includes('scarf')) {
+    const at = eye + (hasHeart ? 2 : 3)
+    for (let c = col - 3; c <= col; c++) put(g, at, c, ink || 'V')
+    put(g, at + 1, col - 3, ink || 'V')
+    put(g, at + 2, col - 3, ink || 'V')
   }
   if (items.includes('tie') && !hasHeart) {
     put(g, eye + 3, col - 1, ink || 'T')
