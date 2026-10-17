@@ -4,7 +4,7 @@ Pixel-art pets that live above your Claude Code prompt. They walk around while y
 
 ![Pets for Claude Code](media/demo.gif)
 
-▶️ [Watch the 30-second demo](media/showcase-short.mp4) · [vertical, for phones](media/showcase-short-vertical.mp4) · [the full 100-second tour](media/showcase.mp4)
+▶️ [Watch the 40-second demo](media/showcase-short.mp4) · [vertical, for phones](media/showcase-short-vertical.mp4) · [the full 100-second tour](media/showcase.mp4)
 
 ---
 
@@ -79,7 +79,8 @@ They also read **Claude's** replies: worried when it apologizes or hits an error
 ### 🍅 Useful while you work
 - **Focus:** `/pet focus 25` starts a focus session; the pets nap quietly and call a break when it's over
 - **PR watcher:** with the GitHub CLI (`gh`) signed in, they tell you about new reviews on your PR and cheer or panic when CI turns green or red (`/pet watch off` to stop)
-- **Usage limits:** when you've used 80% or 95% of your 5-hour or weekly limit, everyone barks and warns you. At 100% they announce it, say when Claude is back, and nap until then (`/pet limits off`). Needs a Claude subscription
+- **Usage limits:** when you've used 80% or 95% of your 5-hour or weekly limit, everyone barks and warns you. At 100% they announce it, say when Claude is back, and nap until then. Needs a Claude subscription
+- **Conversation filling up:** at 75% and 90% of the context window, a pet comes over and suggests `/compact` (`/pet limits off` mutes both)
 - **Wellbeing nudges:** a reminder to drink water after 90 minutes nonstop, and to go to bed after midnight (`/pet care off`)
 
 ### 🌦️ Their world
@@ -125,7 +126,7 @@ They also read **Claude's** replies: worried when it apologizes or hits an error
 | `/pet toys on\|off` | a bed and a scratching post |
 | `/pet weather <city>\|on\|off` | live weather (off by default) |
 | `/pet seasons\|care\|watch on\|off` | seasons, wellbeing nudges, PR/CI watcher |
-| `/pet limits on\|off` | bark when your usage limit runs low |
+| `/pet limits on\|off` | warn when your usage limit or the conversation runs low |
 | `/pet size auto\|tiny\|small\|large` | auto: small in the terminal, full size in the desktop app |
 | `/pet off`, `/pet on` | hide or show the pets |
 
@@ -148,7 +149,7 @@ hooks/growth.ts      levels, badges, personalities, friendships
 hooks/world.ts       weather, seasons, toys
 hooks/watch.ts       the PR and CI watcher
 hooks/tags.ts        name tag colors
-hooks/limits.ts      barks for your 5-hour and weekly limits
+hooks/limits.ts      warnings for your usage limits and a full conversation
 hooks/accessories.ts hats, shades, ties, laptops
 hooks/moods.ts       mood reactions and pet talk
 hooks/sass.ts        reactions to Claude's actions

@@ -53,3 +53,20 @@ export function limitLines(alert: LimitAlert, now: number): { say: string; toast
     return { say: `95% of the ${alert.window}!! save some for me`, toast: `🐶 95% of your ${alert.window} is used.${back ? ` It resets ${back.replace('back ', '')}.` : ''}` }
   return { say: `psst… 80% of the ${alert.window} is gone`, toast: `🐶 80% of your ${alert.window} is used.${back ? ` It resets ${back.replace('back ', '')}.` : ''}` }
 }
+
+// The conversation filling up: a warning at 75% and 90% of the context window.
+// After /compact or /clear it drops, and the warnings start over.
+export type ContextLevel = 0 | 75 | 90
+
+export function contextLevel(percent: number | undefined, warned: ContextLevel): { level: ContextLevel; alert: boolean } {
+  if (percent === undefined) return { level: warned, alert: false }
+  if (percent < 60) return { level: 0, alert: false }
+  const level: ContextLevel = percent >= 90 ? 90 : percent >= 75 ? 75 : 0
+  return level > warned ? { level, alert: true } : { level: warned, alert: false }
+}
+
+export function contextLines(level: 75 | 90, percent: number): { say: string; toast: string } {
+  return level === 90
+    ? { say: 'my brain is full!! 🧠 /compact?', toast: `🐶 This conversation is ${percent}% full. Time for /compact (or /clear to start fresh).` }
+    : { say: 'this chat is getting long… 📜', toast: `🐶 This conversation is ${percent}% full. /compact soon keeps Claude sharp.` }
+}

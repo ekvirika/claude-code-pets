@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { keysUpTo, limitAlerts, limitLines, resetText, windowName } from '../hooks/limits'
+import { contextLevel, contextLines, keysUpTo, limitAlerts, limitLines, resetText, windowName } from '../hooks/limits'
 
 const RESET = '2026-10-17T20:00:00Z'
 const NOW = Date.parse('2026-10-17T17:55:00Z')
@@ -57,5 +57,39 @@ test('in a session: the pets bark when the 5-hour limit runs low, once', async (
   await measure(100)
   expect(toasts.some(t => t.includes("You've hit your 5-hour limit"))).toBe(true)
 
-  expect((await $.command.run({ command: 'pet', args: 'limits off' } as never)).text).toContain('weekly limit): off')
+  expect((await $.command.run({ command: 'pet', args: 'limits off' } as never)).text).toContain('Limit warnings')
+})
+
+test('conversation filling up: warn at 75% and 90%, start over after /compact', async () => {
+  expect(contextLevel(50, 0)).toEqual({ level: 0, alert: false })
+  expect(contextLevel(76, 0)).toEqual({ level: 75, alert: true })
+  expect(contextLevel(80, 75)).toEqual({ level: 75, alert: false })
+  expect(contextLevel(91, 75)).toEqual({ level: 90, alert: true })
+  expect(contextLevel(95, 90)).toEqual({ level: 90, alert: false })
+  expect(contextLevel(20, 90)).toEqual({ level: 0, alert: false })
+  expect(contextLevel(undefined, 75)).toEqual({ level: 75, alert: false })
+  expect(contextLines(90, 92).toast).toContain('92% full')
+})
+
+test('in a session: a pet warns once when the conversation is 75% full', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  const toasts: string[] = []
+  on('command.register', () => ({ value: undefined }) as never)
+  on('process.run', () => ({ value: { exitCode: 1, stdout: '', stderr: 'no PR' } }) as never)
+  on('ui.toast', (_$, e) => {
+    toasts.push(e.text)
+    return { value: undefined } as never
+  })
+  on('session.measure', (_$, e) => ({ changed: e.changed }))
+  on('session.start', () => ({ cwd: '/x' }))
+  await $.session.start({ cwd: '/x' } as never)
+  const fill = (percent: number) => $.session.measure({ context: { window: 200_000, percent }, rateLimits: [], changed: ['context'] } as never)
+  await fill(40)
+  await fill(77)
+  await fill(79)
+  expect(toasts.filter(t => t.includes('conversation is')).length).toBe(1)
+  await fill(10)
+  await fill(78)
+  expect(toasts.filter(t => t.includes('conversation is')).length).toBe(2)
 })

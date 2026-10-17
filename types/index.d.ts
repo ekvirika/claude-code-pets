@@ -48,6 +48,6 @@ export type Ball = { x: number; vx: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    pets: { pets: Pet[]; isShown: boolean; idleTicks: number; boss: boolean; sass: boolean; moods: boolean; size: 'auto' | 'tiny' | 'small' | 'large'; ball: Ball | null; focus: number; toys: boolean; names: boolean; weather: 'none' | 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm'; counted: boolean; limitWarned: string[] }
+    pets: { pets: Pet[]; isShown: boolean; idleTicks: number; boss: boolean; sass: boolean; moods: boolean; size: 'auto' | 'tiny' | 'small' | 'large'; ball: Ball | null; focus: number; toys: boolean; names: boolean; weather: 'none' | 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm'; counted: boolean; limitWarned: string[]; contextWarned: 0 | 75 | 90 }
   }
 }
