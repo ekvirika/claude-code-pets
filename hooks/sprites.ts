@@ -647,3 +647,30 @@ export function pixels(frame: Frame, skin: Skin, dir: 1 | -1): (string | null)[]
     return dir === 1 ? cells : cells.reverse()
   })
 }
+
+// Half the size: each 2x2 block of pixels becomes one, for narrow terminals.
+// An eye in the block wins, so the face survives; otherwise the most common
+// letter, and a block with only one pixel in it is left empty, except in the legs.
+export function shrink(f: Frame): Frame {
+  const h = Math.ceil(f.length / 2)
+  const w = Math.ceil((f[0]?.length ?? 0) / 2)
+  const out: string[] = []
+  for (let r = 0; r < h; r++) {
+    let row = ''
+    for (let c = 0; c < w; c++) {
+      const cells = [f[2 * r]?.[2 * c], f[2 * r]?.[2 * c + 1], f[2 * r + 1]?.[2 * c], f[2 * r + 1]?.[2 * c + 1]].filter(
+        (ch): ch is string => ch !== undefined && ch !== '.',
+      )
+      // Legs are one pixel wide: in the bottom rows a lone pixel is kept, so they survive.
+      const isLegRow = r >= h - 2
+      if (cells.includes('E')) row += 'E'
+      else if (cells.length >= 2 || (isLegRow && cells.length === 1)) {
+        const counts = new Map<string, number>()
+        for (const ch of cells) counts.set(ch, (counts.get(ch) ?? 0) + 1)
+        row += [...counts].sort((a, b) => b[1] - a[1])[0]![0]
+      } else row += '.'
+    }
+    out.push(row)
+  }
+  return out
+}

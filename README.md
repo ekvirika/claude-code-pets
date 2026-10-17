@@ -16,7 +16,7 @@ You need **Claude Code 2.1.287 or newer**, which supports mods (`claude update` 
 /plugin install pets --marketplace ekvirika/claude-code-pets
 ```
 
-Answer `y` to add the marketplace and pick a scope (user scope gives you pets in every session). Biscuit the golden retriever shows up above your prompt right away. Pets also appear in the Code tab of the Claude desktop app.
+Answer `y` to add the marketplace and pick a scope (user scope gives you pets in every session). Biscuit the golden retriever shows up above your prompt right away. Pets also appear in the Code tab of the Claude desktop app. In a narrow terminal (under 120 columns) the pets shrink to half size automatically; `/pet size large` or `/pet size small` picks one for good.
 
 ## Quick start
 
@@ -99,6 +99,7 @@ They also read **Claude's** replies: worried when it apologizes or hits an error
 | `/pet breed <name> <breed>`, `/pet skin <name> <skin>` | change looks |
 | `/pet name <name> <new name>`, `/pet remove <name>` | rename, say goodbye |
 | `/pet breeds`, `/pet skins`, `/pet hats` | list them all |
+| `/pet size small\|large\|auto` | small pets (8×3) for narrow terminals; auto switches under 120 columns |
 | `/pet off`, `/pet on` | hide or show the pets |
 
 ---

@@ -7,7 +7,7 @@ import { laptopSpot, roll } from '../hooks/life'
 import type { World } from '../hooks/life'
 import { anchor, dress, fainted } from '../hooks/accessories'
 import { react } from '../hooks/sass'
-import { BOWL_FULL, BOWL_SKIN, BREEDS, H, SKINS, W, outlineOf, pixels } from '../hooks/sprites'
+import { BOWL_FULL, BOWL_SKIN, BREEDS, H, SKINS, W, outlineOf, pixels, shrink } from '../hooks/sprites'
 
 const BAND = { component: 'AbovePrompt', requestId: 'band', props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 80, scroll: { offset: 0, bodyRows: 12 }, view: {} } } as const
 
@@ -175,4 +175,31 @@ test('antics: zoomies are fast, chasers close in on the ball, the ball slows dow
   let b = { x: 2, vx: 3 }
   for (let i = 0; i < 200; i++) b = roll(b, 80)
   expect(b.vx).toBe(0)
+})
+
+test('small pets: half the size, eyes kept, and narrow terminals get them automatically', async ($, on) => {
+  const walk = BREEDS.dog.retriever!.poses.walk[0]!
+  const small = shrink(walk)
+  expect(small.length).toBe(6)
+  expect(small[0]!.length).toBe(8)
+  expect(small.join('')).toContain('E')
+
+  mock.clock(on)
+  mock.store(on)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>other band</Text>
+  })
+  on('command.register', () => ({ value: undefined }) as never)
+  on('session.start', () => ({ cwd: '/x' }))
+  await $.session.start({ cwd: '/x' } as never)
+  const narrow = { ...BAND, props: { ...BAND.props, bodyColumns: 76 } }
+  const ui = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...narrow })
+  const raster = await ui.find({ type: 'Raster' })
+  expect((raster as unknown as { props: { columns: number; rows: number } }).props.columns).toBe(8)
+  await ui.unmount()
+  expect((await $.command.run({ command: 'pet', args: 'size large' } as never)).text).toContain('large')
+  const big = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...narrow })
+  expect((await big.find({ type: 'Raster' }) as unknown as { props: { columns: number } }).props.columns).toBe(16)
+  await big.unmount()
 })

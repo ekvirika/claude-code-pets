@@ -32,7 +32,7 @@ import { rasterCells, svgSource } from './paint'
 import { react } from './sass'
 import { CLAUDE_MOODS, CLAUDE_REACTIONS, PRAISE, SPEAK, USER_MOODS, USER_REACTIONS, asMood, lineFor, parsePetTalk } from './moods'
 import type { PetTalk, Reaction } from './moods'
-import { BOWL_FULL, BOWL_HALF, BOWL_SKIN, BREEDS, SKINS, W, breedOf, frameFor, monoProps, pixels } from './sprites'
+import { BOWL_FULL, BOWL_HALF, BOWL_SKIN, BREEDS, SKINS, W, breedOf, frameFor, monoProps, pixels, shrink } from './sprites'
 import type { Frame, Species } from './sprites'
 
 export { FIRST, eatingSpot, feed, nap, parseAdopt, step, wake } from './life'
@@ -47,6 +47,9 @@ const boss = atom({ plugin: 'pets', key: 'boss' } as const, false)
 const sass = atom({ plugin: 'pets', key: 'sass' } as const, true)
 const ball = atom({ plugin: 'pets', key: 'ball' } as const, null)
 const moods = atom({ plugin: 'pets', key: 'moods' } as const, true)
+// auto: small pets in a terminal under 120 columns, big ones in a wider one.
+const size = atom({ plugin: 'pets', key: 'size' } as const, 'auto')
+const SMALL_BELOW = 120
 
 // The band's width as last drawn; pets turn around at its edges.
 let room = 60
@@ -311,6 +314,7 @@ async function save($: EngineInterface) {
     boss: await read($, boss),
     sass: await read($, sass),
     moods: await read($, moods),
+    size: await read($, size),
     savedAt: await $.clock.now(),
     pets: list.map(({ species, breed, skin, name, hunger, energy, hat }): Saved => ({ species, breed, skin, name, hunger, energy, hat })),
   })
@@ -342,6 +346,7 @@ const HELP = [
   '  /pet party                                     celebrate',
   '  /pet boss [on|off]                             look busy, the boss is coming',
   '  /pet sass on|off                               comments on your code',
+  '  /pet size small|large|auto                    small pets for narrow terminals',
   '  /pet moods on|off                              react to the mood of the chat (a tiny AI check per message)',
   '  …or just talk to them: "good boy", "Biscuit sit", "Pixel come here", "everyone dance"',
   '  /pet breed <name> <breed>  /pet skin <name> <skin>  /pet name <name> <new name>',
@@ -350,7 +355,7 @@ const HELP = [
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    const saved = (await $.store.get('pets')) as { isShown?: boolean; boss?: boolean; sass?: boolean; moods?: boolean; savedAt?: number; pets?: Saved[] } | undefined
+    const saved = (await $.store.get('pets')) as { isShown?: boolean; boss?: boolean; sass?: boolean; moods?: boolean; size?: string; savedAt?: number; pets?: Saved[] } | undefined
     if (saved?.pets?.length) {
       // Time away: they got hungrier, and they slept.
       const awayMin = saved.savedAt ? Math.max(0, ((await $.clock.now()) - saved.savedAt) / 60_000) : 0
@@ -368,6 +373,10 @@ export const register: Register = on => {
     if (typeof saved?.boss === 'boolean') await update($, boss, () => saved.boss as boolean)
     if (typeof saved?.sass === 'boolean') await update($, sass, () => saved.sass as boolean)
     if (typeof saved?.moods === 'boolean') await update($, moods, () => saved.moods as boolean)
+    if (saved?.size === 'small' || saved?.size === 'large' || saved?.size === 'auto') {
+      const chosen = saved.size
+      await update($, size, () => chosen)
+    }
     await $.command.register({
       name: 'pet',
       description: 'Adopt, feed, dress up and play with your pixel pets (or make them look busy)',
@@ -478,6 +487,13 @@ export const register: Register = on => {
       const now = arg === 'on' ? true : arg === 'off' ? false : !(await read($, sass))
       await update($, sass, () => now)
       reply = now ? '😏 Sass on: the pets will comment on what Claude does.' : '🤐 Sass off.'
+    } else if (verb === 'size') {
+      const arg = rest[0]?.toLowerCase()
+      if (arg !== 'small' && arg !== 'large' && arg !== 'auto') {
+        return { text: `Pet size is ${await read($, size)}. /pet size small (8×3), large (16×6) or auto (small under ${SMALL_BELOW} columns)` }
+      }
+      await update($, size, () => arg)
+      reply = arg === 'auto' ? `Pets size themselves: small under ${SMALL_BELOW} columns, large above.` : `Pets are now ${arg}.`
     } else if (verb === 'moods' || verb === 'mood') {
       const arg = rest[0]?.toLowerCase()
       const now = arg === 'on' ? true : arg === 'off' ? false : !(await read($, moods))
@@ -589,7 +605,11 @@ export const register: Register = on => {
     if (e.props.hasSurvey || !(await read($, isShown))) return below
     const list = await read($, pets)
     if (list.length === 0) return below
-    room = Math.max(W, e.props.bodyColumns)
+    // Small pets walk a band twice as wide as it looks, so they cross it at a natural pace.
+    const chosen = await read($, size)
+    const scale = chosen === 'small' || (chosen === 'auto' && e.props.bodyColumns < SMALL_BELOW) ? 2 : 1
+    const paint = (frame: readonly string[], skin: Parameters<typeof pixels>[1], dir: 1 | -1) => pixels(scale === 2 ? shrink(frame) : frame, skin, dir)
+    room = Math.max(W, e.props.bodyColumns * scale)
     const isBoss = await read($, boss)
     const b = await read($, ball)
     const R = $.ui.resolve(e)
@@ -628,7 +648,7 @@ export const register: Register = on => {
       if (p.mood === 'party') worn.splice(0, worn.length, ...worn.filter(w => w === 'shades' || w === 'bowtie'), 'party')
       if (isBoss) worn.push('shades', 'tie')
       if (worn.length) frame = dress(frame, worn, skin.mono === true)
-      const grid = pixels(frame, skin, dir)
+      const grid = paint(frame, skin, dir)
       const text = p.bubble ? `${p.name}: ${p.bubble}` : p.mood === 'sleep' || p.mood === 'nap' ? 'z Z' : ''
       const emoji = p.species === 'dog' ? '🐕' : p.species === 'cat' ? '🐈' : '🦊'
       items.push({
@@ -639,22 +659,25 @@ export const register: Register = on => {
         label: text ? { text, color: skin.D, at: clamp(x + (dir === 1 ? 6 : 0), 0, Math.max(0, room - text.length)) } : undefined,
       })
       if (p.bowl !== null && !isBoss) {
-        const bowlGrid = pixels(p.mood === 'eat' && p.moodTicks < 12 ? BOWL_HALF : BOWL_FULL, skin.mono ? monoProps(skin) : BOWL_SKIN, 1)
+        const bowlGrid = paint(p.mood === 'eat' && p.moodTicks < 12 ? BOWL_HALF : BOWL_FULL, skin.mono ? monoProps(skin) : BOWL_SKIN, 1)
         items.push({ key: `bowl-${p.id}`, x: clamp(p.bowl, 0, Math.max(0, room - BOWL_W)), width: BOWL_W, node: draw(`bowl-${p.id}`, bowlGrid, '🥣') })
       }
       if (desk) {
-        items.push({ key: `desk-${p.id}`, x: desk.x, width: LAPTOP_W, node: draw(`desk-${p.id}`, skin.mono ? pixels(LAPTOP_MONO, skin, desk.dir === 1 ? 1 : -1) : pixels(LAPTOP, BOWL_SKIN, desk.dir === 1 ? 1 : -1), '💻') })
+        items.push({ key: `desk-${p.id}`, x: desk.x, width: LAPTOP_W, node: draw(`desk-${p.id}`, skin.mono ? paint(LAPTOP_MONO, skin, desk.dir === 1 ? 1 : -1) : paint(LAPTOP, BOWL_SKIN, desk.dir === 1 ? 1 : -1), '💻') })
       }
     }
-    if (b && !isBoss) items.push({ key: 'ball', x: clamp(Math.round(b.x), 0, Math.max(0, room - BALL_W)), width: BALL_W, node: draw('ball', pixels(BALL, BOWL_SKIN, 1), '🎾') })
+    if (b && !isBoss) items.push({ key: 'ball', x: clamp(Math.round(b.x), 0, Math.max(0, room - BALL_W)), width: BALL_W, node: draw('ball', paint(BALL, BOWL_SKIN, 1), '🎾') })
     items.sort((a, c) => a.x - c.x)
 
+    // Positions are in the walking band's units; on screen they shrink with the pets.
     let end = 0
     const row = items.map(item => {
-      const gap = Math.max(0, item.x - end)
-      end += gap + item.width
+      const at = Math.floor(item.x / scale)
+      const width = Math.ceil(item.width / scale)
+      const gap = Math.max(0, at - end)
+      end += gap + width
       return (
-        <Box key={`s-${item.key}`} marginLeft={gap} width={item.width} flexShrink={0}>
+        <Box key={`s-${item.key}`} marginLeft={gap} width={width} flexShrink={0}>
           {item.node as never}
         </Box>
       )
@@ -665,7 +688,8 @@ export const register: Register = on => {
       .filter(item => item.label)
       .sort((a, c) => a.label!.at - c.label!.at)
       .map(item => {
-        const { text, color, at } = item.label!
+        const { text, color } = item.label!
+        const at = Math.max(0, Math.min(Math.floor(item.label!.at / scale), e.props.bodyColumns - text.length))
         const gap = Math.max(labelEnd === 0 ? 0 : 1, at - labelEnd)
         labelEnd += gap + text.length
         return (

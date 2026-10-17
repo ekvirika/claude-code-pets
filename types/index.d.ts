@@ -42,6 +42,6 @@ export type Ball = { x: number; vx: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    pets: { pets: Pet[]; isShown: boolean; idleTicks: number; boss: boolean; sass: boolean; moods: boolean; ball: Ball | null }
+    pets: { pets: Pet[]; isShown: boolean; idleTicks: number; boss: boolean; sass: boolean; moods: boolean; size: 'auto' | 'small' | 'large'; ball: Ball | null }
   }
 }
