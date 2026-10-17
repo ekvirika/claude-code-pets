@@ -37,6 +37,7 @@ import { BED, BED_SKIN, BED_W, POST, POST_SKIN, POST_W, PUMPKIN, PUMPKIN_SKIN, P
 import { parsePr, prChanges } from './watch'
 import type { PrSnapshot } from './watch'
 import { NAME_COLORS, autoNameColor, colorName, parseColor, talkColor } from './tags'
+import { BARK, keysUpTo, limitAlerts, limitLines, type RateWindow } from './limits'
 import { CLAUDE_MOODS, CLAUDE_REACTIONS, PRAISE, SPEAK, USER_MOODS, USER_REACTIONS, asMood, lineFor, parsePetTalk } from './moods'
 import type { PetTalk, Reaction } from './moods'
 import { BOWL_FULL, BOWL_HALF, BOWL_SKIN, BREEDS, MW, SKINS, TW, W, breedOf, frameFor, miniFrame, monoProps, pixels, shrink, tinyFrame } from './sprites'
@@ -62,12 +63,14 @@ const focus = atom({ plugin: 'pets', key: 'focus' } as const, 0)
 const toys = atom({ plugin: 'pets', key: 'toys' } as const, false)
 const weather = atom({ plugin: 'pets', key: 'weather' } as const, 'none')
 const counted = atom({ plugin: 'pets', key: 'counted' } as const, false)
+// Usage-limit levels the pets already barked about, so a reload doesn't bark again.
+const limitWarned = atom({ plugin: 'pets', key: 'limitWarned' } as const, [] as string[])
 
 // Your history together and the pets' settings, kept in the store across sessions.
 let stats: Stats = emptyStats(0)
 let badges: string[] = []
 let bonds: Bonds = {}
-const settings = { watch: true, seasons: true, care: true, weatherCity: null as string | null }
+const settings = { watch: true, seasons: true, care: true, limits: true, weatherCity: null as string | null }
 let pr: PrSnapshot | undefined
 let watchTimer: Timer | undefined
 let weatherTimer: Timer | undefined
@@ -252,6 +255,32 @@ async function minuteTick($: EngineInterface) {
     lastLateNudge = minutes
     await careNudge($, pick(["it's late… 🌙", 'go to bed 🥱', '*yawns pointedly*']), "🌙 It's past midnight. The pets think you should sleep.")
   }
+}
+
+// Your 5-hour or weekly limit is running low: everyone barks, and at 100% they nap until it resets.
+async function watchLimits($: EngineInterface, windows: readonly RateWindow[]) {
+  if (!settings.limits || !(await read($, isShown))) return
+  const alerts = limitAlerts(windows, await read($, limitWarned))
+  if (!alerts.length) return
+  const alert = alerts.reduce((a, b) => (b.level > a.level ? b : a))
+  await update($, limitWarned, w => [...new Set([...w, ...alerts.flatMap(keysUpTo)])].slice(-40))
+  const list = await read($, pets)
+  if (!list.length) return
+  const { say, toast } = limitLines(alert, await $.clock.now())
+  const lead = list[0]!.id
+  const out = alert.level === 100
+  await update($, pets, l =>
+    l.map(p => ({
+      ...p,
+      bowl: null,
+      chasing: out ? null : p.chasing,
+      mood: out ? ('nap' as const) : ('happy' as const),
+      moodTicks: out ? 10 * PER_MINUTE : 14,
+      bubble: p.id === lead ? say : BARK[p.species],
+      bubbleTicks: p.id === lead ? 40 : 20,
+    })),
+  )
+  $.ui.toast(toast)
 }
 
 async function careNudge($: EngineInterface, line: string, toast: string) {
@@ -617,6 +646,7 @@ const HELP = [
   '  /pet toys on|off                               a bed and a scratching post',
   '  /pet weather <city>|on|off                     live weather on the band (off by default)',
   '  /pet seasons|care|watch on|off                 seasons, wellbeing nudges, PR/CI watcher',
+  '  /pet limits on|off                             bark when your 5-hour or weekly limit runs low',
   '  /pet names on|off                              name tags over their heads',
   '  /pet namecolor <name|all> <color|#hex|auto>    color a name tag (red, pink, gold, blue, …)',
   '  /pet size auto|tiny|small|large               auto: small in the terminal, full size in the desktop app',
@@ -867,12 +897,12 @@ export const register: Register = on => {
           : '🌦️ Weather on, located by your IP address (sent to wttr.in). Use /pet weather <city> to name a place instead.'
       }
       startWeather($)
-    } else if (verb === 'seasons' || verb === 'care' || verb === 'watch') {
-      const key = verb as 'seasons' | 'care' | 'watch'
+    } else if (verb === 'seasons' || verb === 'care' || verb === 'watch' || verb === 'limits') {
+      const key = verb as 'seasons' | 'care' | 'watch' | 'limits'
       const arg = rest[0]?.toLowerCase()
       settings[key] = arg === 'on' ? true : arg === 'off' ? false : !settings[key]
       if (key === 'watch') startWatching($)
-      const what = { seasons: 'Seasons (snow and santa hats in December, a pumpkin at Halloween)', care: 'Wellbeing nudges (water after 90 min nonstop, bedtime after midnight)', watch: 'PR watcher (reviews and CI, via the gh CLI every 3 min)' }[key]
+      const what = { seasons: 'Seasons (snow and santa hats in December, a pumpkin at Halloween)', care: 'Wellbeing nudges (water after 90 min nonstop, bedtime after midnight)', watch: 'PR watcher (reviews and CI, via the gh CLI every 3 min)', limits: 'Usage-limit barks (at 80%, 95% and 100% of your 5-hour or weekly limit)' }[key]
       reply = `${what}: ${settings[key] ? 'on' : 'off'}.`
     } else if (verb === 'size') {
       const arg = rest[0]?.toLowerCase()
@@ -990,6 +1020,11 @@ export const register: Register = on => {
       // Off the prompt's own path, so reading the mood never slows your message down.
       $.clock.after(0, () => void readUserMood($, sample))
     }
+    return next(e)
+  })
+
+  on('session.measure', async ($, e, next) => {
+    if (e.changed.includes('rateLimits')) await watchLimits($, e.rateLimits)
     return next(e)
   })
 
