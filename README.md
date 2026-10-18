@@ -4,7 +4,7 @@ Pixel-art pets that live above your Claude Code prompt. They walk around while y
 
 ![Pets for Claude Code](media/demo.gif)
 
-▶️ [Watch the 40-second demo](media/showcase-short.mp4) · [vertical, for phones](media/showcase-short-vertical.mp4) · [the full 100-second tour](media/showcase.mp4)
+▶️ [Watch the 40-second demo](https://github.com/ekvirika/claude-code-pets/raw/media/showcase-short.mp4) · [vertical, for phones](https://github.com/ekvirika/claude-code-pets/raw/media/showcase-short-vertical.mp4) · [the full 100-second tour](https://github.com/ekvirika/claude-code-pets/raw/media/showcase.mp4)
 
 ---
 
@@ -13,8 +13,10 @@ Pixel-art pets that live above your Claude Code prompt. They walk around while y
 You need **Claude Code 2.1.287 or newer**, which supports mods (`claude update` if you're not sure). In a Claude Code terminal session, type:
 
 ```
-/plugin install pets --marketplace ekvirika/claude-code-pets
+/plugin install prompt-pets --marketplace ekvirika/claude-code-pets
 ```
+
+Already installed it under its old name, `pets`? Run `/plugin uninstall pets` first; the pets start fresh under the new name.
 
 Answer `y` to add the marketplace and pick a scope (user scope gives you pets in every session). Biscuit the golden retriever shows up above your prompt right away. Pets also appear in the Code tab of the Claude desktop app. In the terminal they use compact hand-drawn art (10×4 cells) so they don't take over your screen; in the desktop app they're full size. `/pet size tiny`, `small` or `large` picks one for good.
 

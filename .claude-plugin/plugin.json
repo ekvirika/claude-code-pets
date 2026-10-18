@@ -1,6 +1,6 @@
 {
-  "name": "pets",
-  "version": "1.3.0",
+  "name": "prompt-pets",
+  "version": "1.4.0",
   "description": "Pixel-art pets that live above your Claude Code prompt: they walk, eat, nap, wear hats, play fetch, react to your work and the mood of the chat, and look very busy in boss mode",
   "author": { "name": "Elene Kvirikashvili", "url": "https://github.com/ekvirika" },
   "homepage": "https://github.com/ekvirika/claude-code-pets",

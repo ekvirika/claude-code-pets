@@ -4,7 +4,7 @@
   "description": "Pixel pets for Claude Code",
   "plugins": [
     {
-      "name": "pets",
+      "name": "prompt-pets",
       "source": "./",
       "description": "Pixel-art pets that live above your Claude Code prompt"
     }

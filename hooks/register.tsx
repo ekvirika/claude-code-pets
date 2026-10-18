@@ -48,25 +48,25 @@ export { FIRST, eatingSpot, feed, nap, parseAdopt, step, wake } from './life'
 const MAX_PETS = 5
 const BALL: Frame = ['.RR.', 'RWRR', 'RRRR', '.RR.']
 
-const pets = atom({ plugin: 'pets', key: 'pets' } as const, [FIRST])
-const isShown = atom({ plugin: 'pets', key: 'isShown' } as const, true)
-const idleTicks = atom({ plugin: 'pets', key: 'idleTicks' } as const, 0)
-const boss = atom({ plugin: 'pets', key: 'boss' } as const, false)
-const sass = atom({ plugin: 'pets', key: 'sass' } as const, true)
-const ball = atom({ plugin: 'pets', key: 'ball' } as const, null)
-const moods = atom({ plugin: 'pets', key: 'moods' } as const, true)
+const pets = atom({ plugin: 'prompt-pets', key: 'pets' } as const, [FIRST])
+const isShown = atom({ plugin: 'prompt-pets', key: 'isShown' } as const, true)
+const idleTicks = atom({ plugin: 'prompt-pets', key: 'idleTicks' } as const, 0)
+const boss = atom({ plugin: 'prompt-pets', key: 'boss' } as const, false)
+const sass = atom({ plugin: 'prompt-pets', key: 'sass' } as const, true)
+const ball = atom({ plugin: 'prompt-pets', key: 'ball' } as const, null)
+const moods = atom({ plugin: 'prompt-pets', key: 'moods' } as const, true)
 // Name tags over the pets' heads.
-const nameTags = atom({ plugin: 'pets', key: 'names' } as const, false)
+const nameTags = atom({ plugin: 'prompt-pets', key: 'names' } as const, false)
 // auto: tiny art in the terminal (block characters draw big), full-size art in the desktop app.
-const size = atom({ plugin: 'pets', key: 'size' } as const, 'auto')
-const focus = atom({ plugin: 'pets', key: 'focus' } as const, 0)
-const toys = atom({ plugin: 'pets', key: 'toys' } as const, false)
-const weather = atom({ plugin: 'pets', key: 'weather' } as const, 'none')
-const counted = atom({ plugin: 'pets', key: 'counted' } as const, false)
+const size = atom({ plugin: 'prompt-pets', key: 'size' } as const, 'auto')
+const focus = atom({ plugin: 'prompt-pets', key: 'focus' } as const, 0)
+const toys = atom({ plugin: 'prompt-pets', key: 'toys' } as const, false)
+const weather = atom({ plugin: 'prompt-pets', key: 'weather' } as const, 'none')
+const counted = atom({ plugin: 'prompt-pets', key: 'counted' } as const, false)
 // Usage-limit levels the pets already barked about, so a reload doesn't bark again.
-const limitWarned = atom({ plugin: 'pets', key: 'limitWarned' } as const, [] as string[])
+const limitWarned = atom({ plugin: 'prompt-pets', key: 'limitWarned' } as const, [] as string[])
 // How full this conversation was when the pets last warned about it (0, 75 or 90).
-const contextWarned = atom({ plugin: 'pets', key: 'contextWarned' } as const, 0 as ContextLevel)
+const contextWarned = atom({ plugin: 'prompt-pets', key: 'contextWarned' } as const, 0 as ContextLevel)
 
 // Your history together and the pets' settings, kept in the store across sessions.
 let stats: Stats = emptyStats(0)

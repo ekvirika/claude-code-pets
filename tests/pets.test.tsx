@@ -118,7 +118,7 @@ test('commands: adopt a breed, feed, sleep, wake, and the band draws pets and a 
   expect(roster.text).toMatch(/Miso: Kitten, Siamese · lv \d+ \w+ · food .* energy/)
   expect((await $.command.run({ command: 'pet', args: 'hat Miso crown' } as never)).text).toContain('crown')
   expect((await $.command.run({ command: 'pet', args: 'boss on' } as never)).text).toContain('look busy')
-  const bossUi = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...BAND })
+  const bossUi = await $.ui.mount({ plugin: 'prompt-pets', surface: 'terminal', ...BAND })
   expect((await bossUi.findAll({ type: 'Raster' })).length).toBe(4) // 2 pets, 2 laptops (toys are off by default)
   await bossUi.unmount()
   expect((await $.command.run({ command: 'pet', args: 'boss off' } as never)).text).toContain('off')
@@ -126,7 +126,7 @@ test('commands: adopt a breed, feed, sleep, wake, and the band draws pets and a 
   expect((await $.command.run({ command: 'pet', args: 'remove dog' } as never)).text).toContain('Biscuit went home')
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'pets', surface, ...BAND })
+    const ui = await $.ui.mount({ plugin: 'prompt-pets', surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: 'other band' })).toBeDefined()
     expect(await ui.find({ type: surface === 'terminal' ? 'Raster' : 'Svg' })).toBeDefined()
     await ui.unmount()
@@ -204,7 +204,7 @@ test('mini art in the terminal, full art on desktop; name tags in your colors', 
   on('session.start', () => ({ cwd: '/x' }))
   await $.session.start({ cwd: '/x' } as never)
   const cols = async (surface: 'terminal' | 'desktop') => {
-    const ui = await $.ui.mount({ plugin: 'pets', surface, ...BAND })
+    const ui = await $.ui.mount({ plugin: 'prompt-pets', surface, ...BAND })
     const el = (await ui.find({ type: surface === 'terminal' ? 'Raster' : 'Svg' })) as unknown as { props: { columns?: number; width?: number } }
     await ui.unmount()
     return el.props.columns ?? el.props.width
@@ -220,7 +220,7 @@ test('mini art in the terminal, full art on desktop; name tags in your colors', 
 
   // name tags: on, colored, back to auto
   expect((await $.command.run({ command: 'pet', args: 'namecolor Biscuit pink' } as never)).text).toContain('pink')
-  const ui = await $.ui.mount({ plugin: 'pets', surface: 'terminal', ...BAND })
+  const ui = await $.ui.mount({ plugin: 'prompt-pets', surface: 'terminal', ...BAND })
   const tag = (await ui.find({ type: 'Text', text: 'Biscuit' })) as unknown as { props: { color: string } }
   expect(tag.props.color).toBe('#FF8CC6')
   await ui.unmount()
